@@ -1,0 +1,3 @@
+
+Animus
+Animus.jar,core.jar,gluegen-rt.jar,jogl.jar,opengl.jar,supercollider.jar,oscP5.jar
