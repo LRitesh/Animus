@@ -1,8 +1,15 @@
-import processing.opengl.*;
+/*******************************************************************
+Author: Ritesh Lala
+Original release: May 6, 2011
+Updated: Mar 16, 2013
+Cellular Automata for Animus @ MAT EoYS 2011
 
- // Author: Ritesh Lala
-// May 6, 2011
-// Cellular Automata for Animus @ MAT EoYS 2011
+Copyright © 2013 Ritesh Lala <riteshlala.ed@gmail.com>
+
+This work is free. You can redistribute it and/or modify it under the
+terms of the Do What The Fuck You Want To Public License, Version 2,
+as published by Sam Hocevar. See the LICENSE file for more details.
+**********************************************************************/
 
 import supercollider.*;
 import oscP5.*;
