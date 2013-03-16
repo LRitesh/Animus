@@ -1,3 +1,5 @@
+import processing.opengl.*;
+
  // Author: Ritesh Lala
 // May 6, 2011
 // Cellular Automata for Animus @ MAT EoYS 2011
@@ -8,19 +10,14 @@ import oscP5.*;
 OscP5 oscP5;
 Synth synth, synth2;
 
-int w = 1280;  
-int h = 1024;
-PImage img;
-//int w = 640;
-//int h = 480;
-int maxSize = 2800;
+int w = screen.width;  
+int h = screen.height;
+
+int quorumThreshold = 2800;
+int maxMicrobes = 6000;
 float tempM = 0;
 
 float invWidth, invHeight, aspectRatio, aspectRatio2;
-
-//import fullscreen.*;
-
-//FullScreen fs;
 
 PFont aFont;
 
@@ -39,24 +36,11 @@ float inc = TWO_PI/30.0;
 float prevX = width/2; 
 float prevY = height/2;
 
-// openNI for gesture detection
-import SimpleOpenNI.*;
-
-SimpleOpenNI      context;
-// NITE
-XnVSessionManager sessionManager;
-XnVFlowRouter     flowRouter;
-
-PointDrawer       pointDrawer;
-
-// Threading for NITE context updates
-SimpleThread contextUpdate;
-PVector handPoint;
-
 void setup()
 {
   /* start oscP5, listening for incoming messages at port 8475 */
   oscP5 = new OscP5(this,8475);
+  
   // setup screen parameters
   size (w,h);
   invWidth = 1.0f/width;
@@ -82,9 +66,6 @@ void setup()
       allStatesTemp[i][j] = false;
     }
   }
-//  
-//  // init image
-//  img = loadImage("sunflower.jpg");
   
   // initialize the arraylist with storage capacity rows*columns
   microbes = new ArrayList(rows*columns);
@@ -92,42 +73,25 @@ void setup()
   background(0);
   smooth();
   println("press'c' to clean up");
-//  fs = new FullScreen(this);
-  println((rows*columns)/(res));
-
-  // setup NITE context and session manager
-  if (context == null) {
-    contextSetup();
-
-    pointDrawer = new PointDrawer();
-    flowRouter = new XnVFlowRouter();
-    flowRouter.SetActive(pointDrawer);
-
-    sessionManager.AddListener(flowRouter);
-  }
-
-  contextUpdate = new SimpleThread(5,"a");
-  contextUpdate.start();
-//  handPoint = new PVector(0.0,0.0);
-  handPoint = new PVector(width/2,height/2);
   
-      synth = new Synth("sine");
-    
-    // set initial arguments
-    synth.set("amp", 0.5);
-    synth.set("freq", 440);
-    
-    // create synth
-    synth.create();
-    
-    synth2 = new Synth("sine");
-    
-    // set initial arguments
-    synth2.set("amp", 0.5);
-    synth2.set("freq", 440);
-    
-    // create synth
-    synth2.create();
+  // setup supercollider
+  synth = new Synth("sine");
+  
+  // set initial arguments
+  synth.set("amp", 0.5);
+  synth.set("freq", 440);
+  
+  // create synth
+  synth.create();
+  
+  synth2 = new Synth("sine");
+  
+  // set initial arguments
+  synth2.set("amp", 0.5);
+  synth2.set("freq", 440);
+  
+  // create synth
+  synth2.create();
 }
 
 void draw()
@@ -135,14 +99,11 @@ void draw()
   background(0);
   stroke(51,143,188,random(150));
   noFill();
-  //  strokeWeight(2);
-  //  stroke(random(40,55),143,188,random(150));
-  //ellipse(mouseX,mouseY,res,res);
-// if(frameCount%5 == 0)
-    stateUpdate();
-  if (!mousePressed) handMoved();
+
+  // update states for cellular automata
+  stateUpdate();
   
-  if (microbes.size() > maxSize)//((columns*rows)/(res/2))) 
+  if (microbes.size() > quorumThreshold)//((columns*rows)/(res/2))) 
   {
     quorumFlag = true;
     if (glowFlag) {
@@ -159,6 +120,7 @@ void draw()
     quorumFlag = false;
     glowFlag = true;
   }
+  
   // go through the array list of microbes and mark the dead cells  
   // we could include this in the loop where the living ones are drawn but this makes it possible to 
   // draw the recently dead cells with a different color
@@ -179,19 +141,17 @@ void draw()
     }
   }
 
-  //  if(quorumFlag) 
-  //    blurScreen();
   if(quorumFlag) {
     synth.set("freq", 250);
     synth2.set("freq", map(sin(glowCounter),-1,1,250,260)); 
   }
   else {
-    synth.set("freq", map(numberOfMicrobes,0,maxSize,100,250));
-    synth2.set("freq", map(numberOfMicrobes,0,maxSize,100,250));// map(sin(glowCounter),-1,1,440,450)); 
+    synth.set("freq", map(numberOfMicrobes,0,quorumThreshold,100,250));
+    synth2.set("freq", map(numberOfMicrobes,0,quorumThreshold,100,250));
    }
    
   fill(250);
-  text(numberOfMicrobes,150,200);
+  text(numberOfMicrobes,50,50);
   
   float m = millis() - tempM;
   if(m > 60000 ) {
@@ -202,12 +162,10 @@ void draw()
       }
     }
     microbes.clear();
-    background(0,0,0);
-    sessionManager.EndSession();
+    background(0);
     tempM = millis();
   }
-  text((60000-m)/1000,width-200,height-200);
- 
+  text((60000-m)/1000,width-100,height-50);
 }
 
 /*  Update States based on CA Rules  */
@@ -234,7 +192,7 @@ void stateUpdate()
 
       if(cIndex > prevX-stateRadius && cIndex < prevX+stateRadius && rIndex > prevY-stateRadius && rIndex < prevY+stateRadius)
       {
-        if(mNeighbors == (int) (sqrt((cIndex-prevX)*(cIndex-prevX) + (rIndex-prevY)*(rIndex-prevY))/(res*1.5))) 
+        if(mNeighbors == (int) (sqrt((cIndex-prevX)*(cIndex-prevX) + (rIndex-prevY)*(rIndex-prevY))/(res*1.5)) && (microbes.size() < maxMicrobes)) 
         {
           allStatesTemp[cIndex][rIndex] = true;
           microbes.add(new Microbe(new PVector(cIndex,rIndex), true, 10));
@@ -249,7 +207,7 @@ void stateUpdate()
 
         // the number of living cells decreases as the function of distance from the mouse position
         //if(mNeighbors == (int) (sqrt((cIndex-prevX)*(cIndex-prevX) + (rIndex-prevY)*(rIndex-prevY))/(res)))
-        if(mNeighbors == 3 )
+        if(mNeighbors == 3 && (microbes.size() < maxMicrobes))
         {
           allStatesTemp[cIndex][rIndex] = true;
           microbes.add(new Microbe(new PVector(cIndex,rIndex), true, 10));
@@ -297,16 +255,9 @@ void keyPressed()
   switch(key)
   {
    case 'e':
-    // end sessions
-    sessionManager.EndSession();
-    println("end session");
+    stopAndExit();
     break;
-  case 'f':  // enter fullscreen
-   // fs.enter();
-    break;
-  case 'q':  // leave fullscreen
-  //  fs.leave();
-    break;  
+ 
   case 'c':  // clear the screen
     for (int i = 0; i < columns; i++) {
       for (int j = 0; j < rows; j++) {
@@ -319,83 +270,6 @@ void keyPressed()
     break;
   }
 }
-
-/*  hand moved routine  */
-
-void handMoved()
-{
-
-  //  println (handPoint.x + " " + handPoint.y);
-  int radius = 1;
-  int posX = (int) map (handPoint.x, 100, context.depthWidth()-100, 0, columns);
-  int posY = (int) map (handPoint.y, 0, context.depthHeight(), 0, rows);
-
-  ellipse(posX*res,posY*res,res*2,res*2);
-  // mark the state of the cell true if mouseOver'd and not already existing
-
-  for (int xIndex = -radius; xIndex <= radius; xIndex++) {
-    for (int yIndex = -radius; yIndex <= radius; yIndex++) {
-      if (posX+xIndex > 0 && posX+xIndex < columns && posY+yIndex > 0 && posY+yIndex < rows)
-      {
-        if(!allStates[posX+xIndex][posY+yIndex])
-        { 
-          if (true)
-          {
-            allStates[posX+xIndex][posY+yIndex] = true;    
-            // add that cell into the arraylist of microbes (alive and to be drawn)
-            microbes.add(new Microbe(new PVector(posX+xIndex, posY+yIndex), true, 10));
-          }
-        }
-      }
-    }
-  }
-
-  prevX = posX;
-  prevY = posY;
-}
-
-
-/*  session callbacks  */
-
-void onStartSession(PVector pos)
-{
-  println("onStartSession: " + pos);
-}
-
-void onEndSession()
-{
-  println("onEndSession: ");
-}
-
-void onFocusSession(String strFocus,PVector pos,float progress)
-{
-  println("onFocusSession: focus=" + strFocus + ",pos=" + pos + ",progress=" + progress);
-}
-
-/*  NITE context setup  */
-
-void contextSetup() {
-  println("Running Setup:...");
-  context = new SimpleOpenNI(this);
-  println("Animus On Line");
-
-  // mirror is by default enabled
-  context.setMirror(true);
-  println("Mirroring Set");
-
-  // enable depthMap generation 
-  context.enableDepth();
-  println("Genereating Depth Map...");
-
-  // enable the hands + gesture
-  context.enableGesture();
-  context.enableHands();
-  println("Tracking Enabled");
-
-  // setup NITE 
-  sessionManager = context.createSessionManager("Click,Wave", "RaiseHand");
-}
-
 
 void oscEvent(OscMessage theOscMessage) {
   /* check if theOscMessage has the address pattern we are looking for. */
@@ -413,8 +287,9 @@ void oscEvent(OscMessage theOscMessage) {
   println("### received an osc message. with address pattern "+theOscMessage.addrPattern());
 }
 
-void stop() {
+void stopAndExit() {
   synth.free();
   synth2.free();
+  exit();
 }
 
